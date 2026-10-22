@@ -57,6 +57,7 @@ docker compose up --build
 ```
 
 Open:
+- Dashboard: http://localhost:8000/
 - Swagger UI: http://localhost:8000/docs
 - Health: http://localhost:8000/health
 - API prefix: http://localhost:8000/api/v1
@@ -90,6 +91,7 @@ uvicorn app.main:app --reload
 ```
 
 Tables are created on startup for ease of local setup. Alembic configuration is included for future schema migrations.
+The dashboard is served by FastAPI at http://localhost:8000/, so no separate frontend server or CORS configuration is needed for local use.
 
 ## 4. API quick start
 

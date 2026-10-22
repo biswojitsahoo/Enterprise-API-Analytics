@@ -1,9 +1,10 @@
 import logging
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import text
 from app.core.config import settings
 from app.core.security import hash_password
@@ -14,8 +15,9 @@ from app.routers import analytics, auth, records, users
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("enterprise_api")
+FRONTEND_PATH = Path(__file__).resolve().parent.parent / "frontend" / "index.html"
 
-
+ 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
@@ -64,6 +66,11 @@ def health():
     except Exception:
         logger.exception("Health check failed")
         return JSONResponse(status_code=503, content={"status": "error", "database": "unavailable"})
+
+
+@app.get("/", include_in_schema=False)
+def dashboard():
+    return FileResponse(FRONTEND_PATH)
 
 
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
