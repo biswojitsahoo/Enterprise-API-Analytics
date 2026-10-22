@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enterprise API Analytics</title>
+<style>
+:root{font-family:Inter,Segoe UI,Arial,sans-serif;color:#172033;background:#f3f6fb}
+body{margin:0}.wrap{max-width:1100px;margin:auto;padding:24px}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+h1{margin:0;font-size:26px}.muted{color:#63708a}.panel,.kpi{background:#fff;border:1px solid #e3e8f1;border-radius:14px;padding:18px;box-shadow:0 4px 18px #15294b0a}
+.login{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}.login input,.filters input,.filters select{padding:10px;border:1px solid #ccd5e4;border-radius:8px}
+button{background:#2349db;color:white;border:0;padding:10px 14px;border-radius:8px;cursor:pointer}button.secondary{background:#e8edff;color:#1e3baf}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:20px 0}
+.kpi .label{color:#64718a;font-size:13px}.kpi .value{font-size:28px;font-weight:700;margin-top:8px}
+.layout{display:grid;grid-template-columns:1fr;gap:16px}.filters{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px;border-bottom:1px solid #edf0f5;font-size:14px}th{color:#5d6980}
+.status{padding:4px 8px;border-radius:20px;background:#edf2ff;font-size:12px}
+.notice{margin:12px 0;color:#b42318}.ok{color:#067647}.hide{display:none}
+@media(min-width:850px){.layout{grid-template-columns:2fr 1fr}}
+</style>
+</head>
+<body><div class="wrap">
+<header><div><h1>Enterprise API Analytics</h1><p class="muted">Business records · Operational KPIs · REST API dashboard</p></div><a href="http://localhost:8000/docs" target="_blank">Open API docs ↗</a></header>
+<section class="panel">
+<h3>Sign in</h3><div class="login"><input id="email" value="admin@example.com" aria-label="Email"><input id="password" type="password" value="ChangeMe123!" aria-label="Password"><button id="loginBtn">Sign in</button><button class="secondary" id="logoutBtn">Sign out</button></div><div id="message" class="notice"></div>
+</section>
+<div id="app" class="hide">
+<div class="grid">
+<div class="kpi"><div class="label">Total records</div><div id="total" class="value">—</div></div>
+<div class="kpi"><div class="label">Open</div><div id="open" class="value">—</div></div>
+<div class="kpi"><div class="label">In progress</div><div id="progress" class="value">—</div></div>
+<div class="kpi"><div class="label">Closed</div><div id="closed" class="value">—</div></div>
+<div class="kpi"><div class="label">High / critical priority</div><div id="high" class="value">—</div></div>
+</div>
+<div class="layout">
+<section class="panel"><h3>Business records</h3><div class="filters"><input id="search" placeholder="Search title/description"><select id="status"><option value="">All statuses</option><option>open</option><option>in_progress</option><option>closed</option></select><button id="filterBtn">Apply filters</button><button id="refreshBtn" class="secondary">Refresh</button></div>
+<div style="overflow:auto"><table><thead><tr><th>Title</th><th>Status</th><th>Priority</th><th>Owner</th><th>Created</th></tr></thead><tbody id="rows"></tbody></table></div>
+<p id="pagination" class="muted"></p></section>
+<section class="panel"><h3>Records by status</h3><div id="breakdown" class="muted">Sign in to load analytics.</div><h3>Monthly records</h3><div id="monthly" class="muted"></div></section>
+</div>
+<section class="panel" style="margin-top:16px"><h3>Create a record</h3><div class="filters"><input id="title" placeholder="Title"><input id="owner" placeholder="Owner/team"><select id="priority"><option>low</option><option selected>medium</option><option>high</option><option>critical</option></select><select id="newStatus"><option>open</option><option>in_progress</option><option>closed</option></select><button id="createBtn">Create record</button></div><p class="muted">Creating records requires the admin or analyst role.</p></section>
+</div>
+</div>
+<script>
+const API='http://localhost:8000/api/v1'; let token=''; let page=1;
+const el=id=>document.getElementById(id);
+function msg(s,ok=false){el('message').textContent=s;el('message').className=ok?'notice ok':'notice'}
+async function request(path,opts={}){const res=await fetch(API+path,{...opts,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(opts.headers||{})}});if(res.status===204)return null;const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.detail||'Request failed ('+res.status+')');return data}
+async function load(){const [a,b,c,d]=await Promise.all([request('/analytics/overview'),request('/analytics/status-breakdown'),request('/analytics/records-by-month'),request('/records?q='+encodeURIComponent(el('search').value)+'&status='+encodeURIComponent(el('status').value)+'&page='+page+'&page_size=10')]);el('total').textContent=a.total_records;el('open').textContent=a.open_records;el('progress').textContent=a.in_progress_records;el('closed').textContent=a.closed_records;el('high').textContent=a.high_priority_records;el('breakdown').innerHTML=b.map(x=>`<p>${x.status.replace('_',' ')} <strong style="float:right">${x.count}</strong></p>`).join('')||'No records yet';el('monthly').innerHTML=c.map(x=>`<p>${x.month}<strong style="float:right">${x.count}</strong></p>`).join('')||'No records yet';el('rows').innerHTML=d.items.map(x=>`<tr><td>${escapeHtml(x.title)}</td><td><span class="status">${x.status}</span></td><td>${x.priority}</td><td>${escapeHtml(x.owner)}</td><td>${new Date(x.created_at).toLocaleDateString()}</td></tr>`).join('')||'<tr><td colspan="5">No records found</td></tr>';el('pagination').textContent=`Page ${d.page} of ${d.pages} · ${d.total} records`}
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+el('loginBtn').onclick=async()=>{try{const body=new URLSearchParams({username:el('email').value,password:el('password').value});const r=await fetch(API+'/auth/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Login failed');token=d.access_token;el('app').classList.remove('hide');msg('Signed in successfully.',true);await load()}catch(e){msg(e.message)}};
+el('logoutBtn').onclick=()=>{token='';el('app').classList.add('hide');msg('Signed out.',true)};
+el('filterBtn').onclick=()=>{page=1;load().catch(e=>msg(e.message))};el('refreshBtn').onclick=()=>load().catch(e=>msg(e.message));
+el('createBtn').onclick=async()=>{try{await request('/records',{method:'POST',body:JSON.stringify({title:el('title').value,owner:el('owner').value,priority:el('priority').value,status:el('newStatus').value})});el('title').value='';el('owner').value='';msg('Record created.',true);await load()}catch(e){msg(e.message)}};
+</script></body></html>
